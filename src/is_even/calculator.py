@@ -1,8 +1,8 @@
-from src.bit_manipulation import (
+from is_even.bit_manipulation import (
     BitwiseStringTransformer,
     EvennessBitExtractor,
 )
-from src.evenness_IO import (
+from is_even.evenness_IO import (
     EvennessInput,
     EvennessOutput,
 )

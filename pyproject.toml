@@ -2,7 +2,12 @@
 name = "is_even"
 version = "0.1.0"
 description = "A complicated even number checker"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
+
+[project.optional-dependencies]
+dev = [
+    "hypothesis>=6.0",
+]
 
 [tool.pytest]
 pythonpath = ["src"]

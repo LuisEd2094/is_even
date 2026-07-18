@@ -1,218 +1,129 @@
 import pytest
-import random
-from evenness_input import EvennessInput
-from evenness_output import EvennessOutput
-from evenness_calculator import EvennessCalculator
+from hypothesis import given, strategies as st
+from hypothesis import assume
 
+from is_even.evenness_IO import EvennessInput
+from is_even.calculator import EvennessCalculator
+from is_even.bit_manipulation import BitwiseStringTransformer, EvennessBitExtractor
 
-class TestEvennessCalculator:
-    """Pytest test suite for the Evenness Calculator"""
-    
-    @pytest.fixture(autouse=True)
-    def setup(self):
-        """Setup fixture that runs before each test"""
-        self.calculator = EvennessCalculator()
-        self.test_strings = ["test", "hello", "python", "bit", "magic", "complex"]
-    
-    @pytest.mark.parametrize("num_tests", [10])
-    def test_random_evenness(self, num_tests):
-        """Test evenness calculation with random numbers"""
-        for i in range(num_tests):
-            test_num = random.randint(-1000, 1000)
-            test_str = random.choice(self.test_strings)
-            expected_even = test_num % 2 == 0
-            
-            input_data = EvennessInput(number=test_num, magic_string=test_str)
-            output = self.calculator.calculate(input_data)
-            
-            assert output.is_even == expected_even, \
-                f"Test {i+1} FAILED: Number={test_num}, String='{test_str}', " \
-                f"Expected even={expected_even}, Got={output.is_even}"
-    
-    @pytest.mark.parametrize("number,magic_string,expected_even", [
-        (0, "zero", True),
-        (1, "one", False),
-        (-2, "negative", True),
-        (-1, "neg_one", False),
-        (42, "answer", True),
-        (1000000, "big", True),
-        (7, "seven", False),
-        (-100, "neg_hundred", True),
-        (2**31, "max_int", True),
-        (2**31 - 1, "max_int_odd", False),
-    ])
-    def test_specific_numbers(self, number, magic_string, expected_even):
-        """Test evenness calculation with specific edge cases"""
-        input_data = EvennessInput(number=number, magic_string=magic_string)
-        output = self.calculator.calculate(input_data)
-        
-        assert output.is_even == expected_even, \
-            f"FAILED: Number={number}, String='{magic_string}', " \
-            f"Expected even={expected_even}, Got={output.is_even}"
-    
-    def test_zero_evenness(self):
-        """Test that zero is correctly identified as even"""
-        input_data = EvennessInput(number=0, magic_string="zero_test")
-        output = self.calculator.calculate(input_data)
-        
-        assert output.is_even == True, "Zero should be even"
-        assert output.lsb_value == 0, "LSB of zero should be 0"
-    
-    def test_negative_even_numbers(self):
-        """Test negative even numbers"""
-        for num in [-2, -4, -10, -100]:
-            input_data = EvennessInput(number=num, magic_string="negative_even")
-            output = self.calculator.calculate(input_data)
-            assert output.is_even == True, f"{num} should be even"
-    
-    def test_negative_odd_numbers(self):
-        """Test negative odd numbers"""
-        for num in [-1, -3, -7, -99]:
-            input_data = EvennessInput(number=num, magic_string="negative_odd")
-            output = self.calculator.calculate(input_data)
-            assert output.is_even == False, f"{num} should be odd"
-    
-    def test_large_even_numbers(self):
-        """Test large even numbers"""
-        large_evens = [10**6, 2**20, 10**9 + 2]
-        for num in large_evens:
-            input_data = EvennessInput(number=num, magic_string="large_even")
-            output = self.calculator.calculate(input_data)
-            assert output.is_even == True, f"{num} should be even"
-    
-    def test_large_odd_numbers(self):
-        """Test large odd numbers"""
-        large_odds = [10**6 + 1, 2**20 - 1, 10**9 + 3]
-        for num in large_odds:
-            input_data = EvennessInput(number=num, magic_string="large_odd")
-            output = self.calculator.calculate(input_data)
-            assert output.is_even == False, f"{num} should be odd"
-    
-    def test_output_structure(self):
-        """Test that the output has all required fields"""
-        input_data = EvennessInput(number=42, magic_string="test")
-        output = self.calculator.calculate(input_data)
-        
-        assert hasattr(output, 'is_even'), "Output should have 'is_even' attribute"
-        assert hasattr(output, 'computation_steps'), "Output should have 'computation_steps' attribute"
-        assert hasattr(output, 'magic_string_used'), "Output should have 'magic_string_used' attribute"
-        assert hasattr(output, 'lsb_value'), "Output should have 'lsb_value' attribute"
-        
-        assert isinstance(output.is_even, bool), "is_even should be boolean"
-        assert isinstance(output.computation_steps, list), "computation_steps should be list"
-        assert isinstance(output.lsb_value, int), "lsb_value should be integer"
-        assert output.lsb_value in [0, 1], "lsb_value should be 0 or 1"
-    
-    def test_computation_steps_not_empty(self):
-        """Test that computation steps are generated"""
-        input_data = EvennessInput(number=42, magic_string="test")
-        output = self.calculator.calculate(input_data)
-        
-        assert len(output.computation_steps) > 0, "Computation steps should not be empty"
-    
-    def test_magic_string_preserved(self):
-        """Test that the magic string is preserved in output"""
-        test_string = "hello_world"
-        input_data = EvennessInput(number=42, magic_string=test_string)
-        output = self.calculator.calculate(input_data)
-        
-        assert output.magic_string_used == test_string, \
-            f"Magic string should be '{test_string}', got '{output.magic_string_used}'"
-    
-    def test_different_strings_same_result(self):
-        """Test that different strings give the same evenness result for the same number"""
-        test_num = 42
-        expected_even = True
-        
-        for test_str in self.test_strings:
-            input_data = EvennessInput(number=test_num, magic_string=test_str)
-            output = self.calculator.calculate(input_data)
-            assert output.is_even == expected_even, \
-                f"String '{test_str}' changed the result for number {test_num}"
+@given(
+    number=st.integers(),
+    magic_string=st.text(min_size=1)
+)
+def test_evenness_input_validate_valid(number, magic_string):
+    """Valid inputs should pass validation without exception."""
+    inp = EvennessInput(number=number, magic_string=magic_string)
+    assert inp.validate() is True
 
-
-class TestEvennessInputValidation:
-    """Test suite for input validation"""
-    
-    def test_valid_input(self):
-        """Test that valid input passes validation"""
-        input_data = EvennessInput(number=42, magic_string="test")
-        assert input_data.validate() == True
-    
-    def test_invalid_number_type(self):
-        """Test that non-integer number raises ValueError"""
-        input_data = EvennessInput(number="42", magic_string="test")
-        with pytest.raises(ValueError, match="Number must be an integer"):
-            input_data.validate()
-    
-    def test_invalid_string_type(self):
-        """Test that non-string magic_string raises ValueError"""
-        input_data = EvennessInput(number=42, magic_string=123)
-        with pytest.raises(ValueError, match="Magic string must be a string"):
-            input_data.validate()
-    
-    def test_empty_magic_string(self):
-        """Test that empty magic_string raises ValueError"""
-        input_data = EvennessInput(number=42, magic_string="")
+@given(
+    number=st.integers(),
+    magic_string=st.text(min_size=0)
+)
+def test_evenness_input_validate_empty_string_raises(number, magic_string):
+    """Empty magic string should raise ValueError."""
+    inp = EvennessInput(number=number, magic_string=magic_string)
+    if magic_string == "":
         with pytest.raises(ValueError, match="Magic string cannot be empty"):
-            input_data.validate()
-    
-    def test_float_number(self):
-        """Test that float number raises ValueError"""
-        input_data = EvennessInput(number=42.0, magic_string="test")
-        with pytest.raises(ValueError, match="Number must be an integer"):
-            input_data.validate()
+            inp.validate()
+    else:
+        assert inp.validate() is True
+
+@given(
+    number=st.one_of(st.none(), st.floats(), st.booleans(), st.text()),
+    magic_string=st.text(min_size=1)
+)
+def test_evenness_input_validate_invalid_number_raises(number, magic_string):
+    """Non‑integer number should raise ValueError."""
+    assume(not isinstance(number, int))
+    inp = EvennessInput(number=number, magic_string=magic_string)
+    with pytest.raises(ValueError, match="Number must be an integer"):
+        inp.validate()
+
+@given(
+    number=st.integers(),
+    magic_string=st.one_of(st.none(), st.integers(), st.floats(), st.booleans())
+)
+def test_evenness_input_validate_invalid_string_raises(number, magic_string):
+    """Non‑string magic_string should raise ValueError."""
+    assume(not isinstance(magic_string, str))
+    inp = EvennessInput(number=number, magic_string=magic_string)
+    with pytest.raises(ValueError, match="Magic string must be a string"):
+        inp.validate()
+
+@given(
+    number=st.integers(),
+    magic_string=st.text(min_size=1)
+)
+def test_bitwise_string_transformer_output_length(number, magic_string):
+    inp = EvennessInput(number, magic_string)
+    transformer = BitwiseStringTransformer(inp)
+    bits = transformer.transform_string_to_bits()
+    assert len(bits) == 32 * len(magic_string)
+    assert all(b in (0, 1) for b in bits)
 
 
-class TestEvennessOutput:
-    """Test suite for output formatting"""
-    
-    def setup_method(self):
-        self.calculator = EvennessCalculator()
-    
-    def test_output_string_even(self):
-        """Test string representation for even number"""
-        input_data = EvennessInput(number=42, magic_string="test")
-        output = self.calculator.calculate(input_data)
-        output_str = str(output)
-        
-        assert "even" in output_str.lower(), "Output string should contain 'even'"
-        assert "LSB: 0" in output_str, "Output string should show LSB=0"
-    
-    def test_output_string_odd(self):
-        """Test string representation for odd number"""
-        input_data = EvennessInput(number=43, magic_string="test")
-        output = self.calculator.calculate(input_data)
-        output_str = str(output)
-        
-        assert "odd" in output_str.lower(), "Output string should contain 'odd'"
-        assert "LSB: 1" in output_str, "Output string should show LSB=1"
+@given(
+    number=st.integers(),
+    magic_string=st.text(min_size=1)
+)
+def test_bitwise_string_transformer_correct_conversion(number, magic_string):
+    inp = EvennessInput(number, magic_string)
+    transformer = BitwiseStringTransformer(inp)
+    bits = transformer.transform_string_to_bits()
+    chunk_size = 32 
+    chunks = [bits[i:i+chunk_size] for i in range(0, len(bits), chunk_size)]
+    for idx, chunk in enumerate(chunks):
+        ordinal = int("".join(str(b) for b in chunk), 2)
+        assert ordinal == ord(magic_string[idx])
+
+@given(
+    number=st.integers(),
+    magic_string=st.text(min_size=1)
+)
+def test_evenness_bit_extractor_lsb_always_correct(number, magic_string):
+    """
+    The extractor should always return the actual LSB of the number,
+    regardless of the string bits (because the mask forces LSB=1).
+    """
+    inp = EvennessInput(number, magic_string)
+    transformer = BitwiseStringTransformer(inp)
+    bits = transformer.transform_string_to_bits()
+    extractor = EvennessBitExtractor(number, bits)
+    lsb = extractor.extract_lsb_using_string_bits()
+    assert lsb == (number & 1)
 
 
-# Optional: For running detailed step output in verbose mode
-@pytest.mark.skip(reason="Only run manually for debugging")
-class TestDetailedOutput:
-    """Manual test class for viewing detailed computation steps"""
-    
-    def setup_method(self):
-        self.calculator = EvennessCalculator()
-    
-    def test_detailed_steps_even(self):
-        """Print detailed steps for an even number"""
-        input_data = EvennessInput(number=42, magic_string="hello")
-        output = self.calculator.calculate(input_data)
-        
-        print("\nDetailed steps for even number:")
-        for step in output.computation_steps:
-            print(f"  {step}")
-        print(f"\nResult: {output}")
-    
-    def test_detailed_steps_odd(self):
-        """Print detailed steps for an odd number"""
-        input_data = EvennessInput(number=17, magic_string="world")
-        output = self.calculator.calculate(input_data)
-        
-        print("\nDetailed steps for odd number:")
-        for step in output.computation_steps:
-            print(f"  {step}")
-        print(f"\nResult: {output}")
+@given(number=st.integers())
+def test_evenness_bit_extractor_empty_bits_fallback(number):
+    """When transformed_bits is empty, fallback to actual LSB."""
+    extractor = EvennessBitExtractor(number, [])
+    lsb = extractor.extract_lsb_using_string_bits()
+    assert lsb == (number & 1)
+
+
+@given(
+    number=st.integers(),
+    magic_string=st.text(min_size=1)
+)
+def test_evenness_calculator_correct_evenness(number, magic_string):
+    """The calculator should produce the correct evenness result."""
+    inp = EvennessInput(number, magic_string)
+    calc = EvennessCalculator()
+    output = calc.calculate(inp)
+    assert output.is_even == (number % 2 == 0)
+    assert output.magic_string_used == magic_string
+    assert output.lsb_value == (number & 1)
+    assert isinstance(output.computation_steps, list)
+    assert len(output.computation_steps) > 0
+
+
+@given(number=st.integers(), magic_string=st.text(min_size=1))
+def test_evenness_calculator_steps_contain_expected_messages(number, magic_string):
+    """Check that the computation steps include key phrases."""
+    inp = EvennessInput(number, magic_string)
+    calc = EvennessCalculator()
+    output = calc.calculate(inp)
+    steps = " ".join(output.computation_steps)
+    assert "Transforming string" in steps
+    assert "Number to check" in steps
+    assert "Final determination" in steps

@@ -1,4 +1,4 @@
-from src.calculator import (
+from src.is_even.calculator import (
     EvennessCalculator,
 )
 

@@ -1,4 +1,4 @@
-from src.evenness_IO import (
+from is_even.evenness_IO import (
     EvennessInput,
 )
 
@@ -26,10 +26,10 @@ class BitwiseStringTransformer:
         return self.transformed_bits
     
     @staticmethod
-    def _int_to_bit_list(value: int, bits: int = 8) -> list:
-        """Convert integer to list of bits"""
+    def _int_to_bit_list(value: int, bits: int = 32) -> list:
+        """Convert integer to a fixed‑width list of bits (default 32 bits)."""
         return [(value >> i) & 1 for i in range(bits - 1, -1, -1)]
-    
+        
     def get_log(self) -> list:
         return self._transformation_log
 
